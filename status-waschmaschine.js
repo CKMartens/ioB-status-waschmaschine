@@ -6,6 +6,7 @@
 
   17.12.2019:   V0.1.0  komplette Überarbeitung
   20.12.2019:   V0.1.5  Debug eingefügt, Check ob Fertig überarbeitet
+  01.01.2020:   V0.2.0  Code optimiert
 
   to do:
 
@@ -32,7 +33,7 @@ var TELEGRAM = true;                                                            
 var EMPFAENGER = '';
 
 // Ab welcher Wattzahl ist die Maschine fertig (Standby Verbrauch)
-var MIN_WATT = 5;
+var MIN_WATT = 4;
 // Ab welcher Wattzahl soll regelmäßig geprüft werden ob die Maschine fertig (Knitterschutz Verbrauch)
 var CHECK_WATT = 10;
 // Welche Wattzahl wird im lauf nicht unterschritten
@@ -150,13 +151,24 @@ function createDp(id, common) {
 
 // Prüfen ob Waschmaschine läuft
 on({id: AKTOR_VERBRAUCH, change: "gt"}, function (obj) {
-  if (getState('0_userdata.0.' + DP_STROMAN).val === true) {
+  if (getState('0_userdata.0.' + DP_STROMAN).val === true && getState('0_userdata.0.' + DP_LAEUFT).val === false) {
     // Waschmaschine läuft
     if (getState(AKTOR_VERBRAUCH).val >= ON_WATT && getState('0_userdata.0.' + DP_LAEUFT).val === false) {
       setState('0_userdata.0.' + DP_FERTIG, false);
       setState('0_userdata.0.' + DP_LAEUFT, true);
       if (LOGGING === true)  console.log('Haushaltsgeräte: Waschmaschine gestartet');
       if (DEBUG === true)  console.log('Haushaltsgeräte: Waschmaschine DEBUG Skriptstart');
+    }
+  }
+  if (getState('0_userdata.0.' + DP_LAEUFT).val === true) {
+    if (DEBUG === true) {
+      let tmp_power = getState(AKTOR_VERBRAUCH).val;
+      console.log('Haushaltsgeräte DEBUG: Verbrauch wieder angestiegen - AKTOR_VERBRAUCH=' + tmp_power + ' - CHECK_WATT=' + CHECK_WATT + ' - checkEnde=' + checkEnde);
+    }
+    if (getState(AKTOR_VERBRAUCH).val > CHECK_WATT && checkEnde == true) {
+      clearTimeout(checkEnde);
+      checkEnde = null;
+      console.log('Haushaltsgeräte DEBUG: Verbrauch über CHECK_WATT gestiegen. Timeout gelöscht');
     }
   }
 });
@@ -195,6 +207,9 @@ on({id: AKTOR_VERBRAUCH, change: "lt"}, function (obj) {
         clearTimeout(checkEnde);
         checkEnde = null;
         if (LOGGING === true)  console.log('Haushaltsgeräte: Waschmaschine ist fertig, der Strom wurde angeschaltet');
+      } else {
+        clearTimeout(checkEnde);
+        checkEnde = null;
       }
     }, CHECK_TIME * 60000);
   }
@@ -211,18 +226,5 @@ on({id: AKTOR_AN, change: "ne"}, function (obj) {
     // Stromzufuhr wurde ausgeschaltet
     setState('0_userdata.0.' + DP_STROMAN, false);
     if (LOGGING === true)  console.log('Haushaltsgeräte: Waschmaschine Strom wurde ausgeschaltet');
-  }
-});
-
-// Waschmaschine läuft weiter
-on({id: AKTOR_VERBRAUCH, change: "gt"}, function (obj) {
-  if (DEBUG === true) {
-    let tmp_power = getState(AKTOR_VERBRAUCH).val;
-    console.log('Haushaltsgeräte DEBUG: Verbrauch wieder angestiegen - AKTOR_VERBRAUCH=' + tmp_power + ' - CHECK_WATT=' + CHECK_WATT + ' - checkEnde=' + checkEnde);
-  }
-  if (getState(AKTOR_VERBRAUCH).val > CHECK_WATT && checkEnde == true) {
-    clearTimeout(checkEnde);
-    checkEnde = null;
-    console.log('Haushaltsgeräte DEBUG: Verbrauch über CHECK_WATT gestiegen. Timeout gelöscht');
   }
 });
